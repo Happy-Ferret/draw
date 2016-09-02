@@ -19,12 +19,21 @@ func dopoly(cmd byte, dst *Image, pp []image.Point, end0, end1, radius int, src 
 		return
 	}
 
+	addclose := false
+	if pp[0] != pp[len(pp)-1] {
+		addclose = true
+	}
+
 	setdrawop(dst.Display, op)
-	m := 1 + 4 + 2 + 4 + 4 + 4 + 4 + 2*4 + len(pp)*2*3 // too much
-	a := dst.Display.bufimage(m)                       // too much
+	m := 1 + 4 + 2 + 4 + 4 + 4 + 4 + 2*4 + (len(pp)+1)*2*3 // too much
+	a := dst.Display.bufimage(m)                           // too much
 	a[0] = cmd
 	bplong(a[1:], uint32(dst.id))
-	bpshort(a[5:], uint16(len(pp)-1))
+	if addclose {
+		bpshort(a[5:], uint16(len(pp)))
+	} else {
+		bpshort(a[5:], uint16(len(pp)-1))
+	}
 	bplong(a[7:], uint32(end0))
 	bplong(a[11:], uint32(end1))
 	bplong(a[15:], uint32(radius))
@@ -35,9 +44,15 @@ func dopoly(cmd byte, dst *Image, pp []image.Point, end0, end1, radius int, src 
 	ox, oy := 0, 0
 	for _, p := range pp {
 		o += addcoord(a[o:], ox, p.X)
-		o = addcoord(a[o:], oy, p.Y)
+		o += addcoord(a[o:], oy, p.Y)
 		ox, oy = p.X, p.Y
 	}
+
+	if addclose {
+		o += addcoord(a[o:], ox, pp[0].X)
+		o += addcoord(a[o:], oy, pp[0].Y)
+	}
+
 	d := dst.Display
 	d.buf = d.buf[:len(d.buf)-m+o]
 }
